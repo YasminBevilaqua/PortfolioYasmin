@@ -1,10 +1,13 @@
 import { createElement, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './App.css';
 import {
   ArrowUpRight,
   AudioLines,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Code2,
   ExternalLink,
   Github,
@@ -177,7 +180,13 @@ const techIcons = [
 ];
 
 function TechIconsGrid() {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [hoveredIndex, setHoveredIndex] = useState(() => (
+    window.innerWidth <= 650
+      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 0
+      : null
+  ));
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 650);
   const [columns, setColumns] = useState(() => {
     if (window.innerWidth <= 750) return 3;
     if (window.innerWidth <= 900) return 4;
@@ -186,6 +195,11 @@ function TechIconsGrid() {
 
   useEffect(() => {
     const syncColumns = () => {
+      const nextIsMobile = window.innerWidth <= 650;
+      const shouldHighlight = nextIsMobile
+        && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setIsMobile(nextIsMobile);
+      setHoveredIndex((current) => shouldHighlight ? current ?? 0 : null);
       const nextColumns = window.innerWidth <= 750 ? 3 : window.innerWidth <= 900 ? 4 : 6;
       setColumns((current) => current === nextColumns ? current : nextColumns);
     };
@@ -193,6 +207,18 @@ function TechIconsGrid() {
     window.addEventListener('resize', syncColumns);
     return () => window.removeEventListener('resize', syncColumns);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+
+    let activeIndex = 0;
+    const interval = window.setInterval(() => {
+      activeIndex = (activeIndex + 1) % techIcons.length;
+      setHoveredIndex(activeIndex);
+    }, 900);
+
+    return () => window.clearInterval(interval);
+  }, [isMobile]);
 
   const renderIcon = (tech, index) => {
     const active = hoveredIndex === index;
@@ -286,18 +312,24 @@ const playlist = [
   },
 ];
 
-function MiniPlaylist() {
+function MiniPlaylist({ navElement, navScrolled }) {
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const [mobilePlayerExpanded, setMobilePlayerExpanded] = useState(false);
+  const [mobileWidgetDismissed, setMobileWidgetDismissed] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.16);
   const [hasPlaybackError, setHasPlaybackError] = useState(false);
   const audioRef = useRef(null);
+  const resumePlaybackRef = useRef(false);
   const track = playlist[trackIndex];
 
   const selectTrack = (nextIndex) => {
-    if (audioRef.current) audioRef.current.pause();
+    const audio = audioRef.current;
+    resumePlaybackRef.current = Boolean(audio && !audio.paused);
+    if (audio) audio.pause();
     setTrackIndex((nextIndex + playlist.length) % playlist.length);
     setIsPlaying(false);
     setProgress(0);
@@ -314,6 +346,8 @@ function MiniPlaylist() {
       audio.play()
         .then(() => {
           setIsPlaying(true);
+          setHasPlayed(true);
+          setMobileWidgetDismissed(false);
           setHasPlaybackError(false);
         })
         .catch(() => {
@@ -330,127 +364,299 @@ function MiniPlaylist() {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !resumePlaybackRef.current) return;
+
+    resumePlaybackRef.current = false;
+    audio.volume = volume;
+    audio.play()
+      .then(() => {
+        setIsPlaying(true);
+        setHasPlayed(true);
+        setMobileWidgetDismissed(false);
+        setHasPlaybackError(false);
+      })
+      .catch(() => {
+        setIsPlaying(false);
+        setHasPlaybackError(true);
+      });
+  }, [trackIndex, volume]);
+
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds)) return '0:00';
     return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
   };
 
+  const closeMobilePlayer = () => {
+    if (audioRef.current && !audioRef.current.paused) audioRef.current.pause();
+    setIsPlaying(false);
+    setMobilePlayerExpanded(false);
+    setMobileWidgetDismissed(true);
+  };
+
   return (
-    <div
-      className={`mini-player${isPlaying ? ' mini-player-playing' : ''}`}
-      aria-label={`Player da música ${track.title}`}
-      style={{ '--player-cover': track.cover ? `url("${track.cover}")` : 'none' }}
-    >
-      <audio
-        ref={audioRef}
-        src={track.source}
-        preload="metadata"
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-        onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={() => {
-          setIsPlaying(false);
-          setHasPlaybackError(true);
-        }}
-        onEnded={() => {
-          setIsPlaying(false);
-          setProgress(0);
-        }}
-      />
-      <div className="mini-player-header">
-        <span className="mini-player-invite">
-          <AudioLines size={13} aria-hidden="true" />
-          <span>Bora ouvir uma música enquanto isso?</span>
-        </span>
-        {(hasPlaybackError || !isPlaying) && (
-          <span className={`mini-player-live${hasPlaybackError ? ' mini-player-error' : ''}`}>
-            {hasPlaybackError ? 'AUDIO ERROR' : 'PAUSED'}
+    <>
+      <div
+        className={`mini-player${isPlaying ? ' mini-player-playing' : ''}`}
+        aria-label={`Player da música ${track.title}`}
+        style={{ '--player-cover': track.cover ? `url("${track.cover}")` : 'none' }}
+      >
+        <audio
+          ref={audioRef}
+          src={track.source}
+          preload="metadata"
+          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+          onTimeUpdate={(event) => setProgress(event.currentTarget.currentTime)}
+          onPlay={() => {
+            setIsPlaying(true);
+            setHasPlayed(true);
+            setMobileWidgetDismissed(false);
+          }}
+          onPause={() => setIsPlaying(false)}
+          onError={() => {
+            setIsPlaying(false);
+            setHasPlaybackError(true);
+          }}
+          onEnded={() => {
+            setIsPlaying(false);
+            setProgress(0);
+          }}
+        />
+        <div className="mini-player-header">
+          <span className="mini-player-invite">
+            <AudioLines size={13} aria-hidden="true" />
+            <span>Bora ouvir uma música enquanto isso?</span>
           </span>
-        )}
-        {isPlaying && (
-          <span className="mini-player-wave" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </span>
-        )}
-      </div>
-      <div className="mini-player-main">
-        <div className="record-cover" style={{ '--track-color': track.color }}>
-          {track.cover ? (
-            <img className="record-cover-image" src={track.cover} alt="" />
-          ) : (
-            <div className="record-label"><span>YB</span></div>
+          {(hasPlaybackError || !isPlaying) && (
+            <span className={`mini-player-live${hasPlaybackError ? ' mini-player-error' : ''}`}>
+              {hasPlaybackError ? 'AUDIO ERROR' : 'PAUSED'}
+            </span>
+          )}
+          {isPlaying && (
+            <span className="mini-player-wave" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </span>
           )}
         </div>
-        <div className="track-details">
-          <span className="track-mood">{track.mood}</span>
-          <strong>{track.title}</strong>
-          <p>{track.artist}</p>
+        <div className="mini-player-main">
+          <div className="record-cover" style={{ '--track-color': track.color }}>
+            {track.cover ? (
+              <img className="record-cover-image" src={track.cover} alt="" />
+            ) : (
+              <div className="record-label"><span>YB</span></div>
+            )}
+          </div>
+          <div className="track-details">
+            <span className="track-mood">{track.mood}</span>
+            <strong>{track.title}</strong>
+            <p>{track.artist}</p>
+          </div>
+        </div>
+        <div className="mini-progress">
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            value={progress}
+            onChange={(event) => {
+              const nextProgress = Number(event.target.value);
+              setProgress(nextProgress);
+              if (audioRef.current) audioRef.current.currentTime = nextProgress;
+            }}
+            aria-label="Progresso da faixa"
+            style={{ '--progress': `${duration ? (progress / duration) * 100 : 0}%` }}
+          />
+          <div className="mini-time">
+            <span>{formatTime(progress)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+        <div className="mini-player-controls">
+          <div className="transport-controls">
+            <button type="button" onClick={() => selectTrack(trackIndex - 1)} aria-label="Faixa anterior">
+              <SkipBack size={15} fill="currentColor" />
+            </button>
+            <button className="play-button" type="button" onClick={togglePlayback} aria-label={isPlaying ? 'Pausar' : 'Tocar'}>
+              {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
+            </button>
+            <button type="button" onClick={() => selectTrack(trackIndex + 1)} aria-label="Próxima faixa">
+              <SkipForward size={15} fill="currentColor" />
+            </button>
+          </div>
+          <label className="volume-control" aria-label="Volume">
+            <Volume2 size={14} />
+            <input type="range" min="0" max="0.35" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} />
+          </label>
+        </div>
+        <div className="player-queue">
+          <div className="player-queue-heading">
+            <span>NA FILA</span>
+          </div>
+          {playlist.map((item, index) => (
+            <button
+              className={`queue-track${index === trackIndex ? ' queue-track-active' : ''}`}
+              key={item.source}
+              type="button"
+              onClick={() => selectTrack(index)}
+              aria-current={index === trackIndex ? 'true' : undefined}
+            >
+              <span className="queue-track-index">{index === trackIndex && isPlaying ? '♫' : String(index + 1).padStart(2, '0')}</span>
+              <img className="queue-track-cover" src={item.cover} alt="" loading="lazy" />
+              <span className="queue-track-copy">
+                <strong>{item.title}</strong>
+                <small>{item.artist}</small>
+              </span>
+              {index === trackIndex && <span className="queue-track-playing">{isPlaying ? 'TOCANDO' : 'SELECIONADA'}</span>}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="mini-progress">
-        <input
-          type="range"
-          min="0"
-          max={duration || 0}
-          value={progress}
-          onChange={(event) => {
-            const nextProgress = Number(event.target.value);
-            setProgress(nextProgress);
-            if (audioRef.current) audioRef.current.currentTime = nextProgress;
-          }}
-          aria-label="Progresso da faixa"
-          style={{ '--progress': `${duration ? (progress / duration) * 100 : 0}%` }}
-        />
-        <div className="mini-time">
-          <span>{formatTime(progress)}</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-      </div>
-      <div className="mini-player-controls">
-        <div className="transport-controls">
-          <button type="button" onClick={() => selectTrack(trackIndex - 1)} aria-label="Faixa anterior">
-            <SkipBack size={15} fill="currentColor" />
-          </button>
-          <button className="play-button" type="button" onClick={togglePlayback} aria-label={isPlaying ? 'Pausar' : 'Tocar'}>
-            {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
-          </button>
-          <button type="button" onClick={() => selectTrack(trackIndex + 1)} aria-label="Próxima faixa">
-            <SkipForward size={15} fill="currentColor" />
-          </button>
-        </div>
-        <label className="volume-control" aria-label="Volume">
-          <Volume2 size={14} />
-          <input type="range" min="0" max="0.35" step="0.01" value={volume} onChange={(event) => setVolume(Number(event.target.value))} />
-        </label>
-      </div>
-      <div className="player-queue">
-        <div className="player-queue-heading">
-          <span>NA FILA</span>
-        </div>
-        {playlist.map((item, index) => (
-          <button
-            className={`queue-track${index === trackIndex ? ' queue-track-active' : ''}`}
-            key={item.source}
-            type="button"
-            onClick={() => selectTrack(index)}
-            aria-current={index === trackIndex ? 'true' : undefined}
-          >
-            <span className="queue-track-index">{index === trackIndex && isPlaying ? '♫' : String(index + 1).padStart(2, '0')}</span>
-            <img className="queue-track-cover" src={item.cover} alt="" loading="lazy" />
-            <span className="queue-track-copy">
-              <strong>{item.title}</strong>
-              <small>{item.artist}</small>
-            </span>
-            {index === trackIndex && <span className="queue-track-playing">{isPlaying ? 'TOCANDO' : 'SELECIONADA'}</span>}
-          </button>
-        ))}
-      </div>
-    </div>
+      {navElement && navScrolled && isPlaying && createPortal(
+        <div className="nav-audio-card" role="group" aria-label={`Tocando agora: ${track.title}`}>
+          {track.cover ? (
+            <img className="nav-audio-cover" src={track.cover} alt="" />
+          ) : (
+            <span className="nav-audio-icon" aria-hidden="true"><AudioLines size={17} /></span>
+          )}
+          <div className="nav-audio-track">
+            <strong title={track.title}>{track.title}</strong>
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              value={progress}
+              onChange={(event) => {
+                const nextProgress = Number(event.target.value);
+                setProgress(nextProgress);
+                if (audioRef.current) audioRef.current.currentTime = nextProgress;
+              }}
+              aria-label={`Progresso de ${track.title}`}
+              style={{ '--progress': `${duration ? (progress / duration) * 100 : 0}%` }}
+            />
+          </div>
+          <div className="nav-audio-controls">
+            <button type="button" onClick={() => selectTrack(trackIndex - 1)} aria-label="Faixa anterior">
+              <SkipBack size={14} fill="currentColor" />
+            </button>
+            <button type="button" onClick={togglePlayback} aria-label="Pausar">
+              <Pause size={15} fill="currentColor" />
+            </button>
+            <button type="button" onClick={() => selectTrack(trackIndex + 1)} aria-label="Próxima faixa">
+              <SkipForward size={14} fill="currentColor" />
+            </button>
+          </div>
+        </div>,
+        navElement,
+      )}
+      {navScrolled && hasPlayed && !mobileWidgetDismissed && createPortal(
+        <div className="mobile-audio-widget" role="group" aria-label="Player de música">
+          {mobilePlayerExpanded ? (
+            <div className="mobile-audio-panel" id="mobile-audio-panel">
+              <div className="mobile-audio-header">
+                <button
+                  className="mobile-audio-heading"
+                  type="button"
+                  onClick={() => setMobilePlayerExpanded(false)}
+                  aria-label="Minimizar player"
+                  aria-expanded="true"
+                >
+                  {track.cover ? (
+                    <img className="mobile-audio-cover" src={track.cover} alt="" />
+                  ) : (
+                    <span className="mobile-audio-cover-fallback"><AudioLines size={18} /></span>
+                  )}
+                  <span className="mobile-audio-track-copy">
+                    <strong>{track.title}</strong>
+                    <small>{track.artist}</small>
+                  </span>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </button>
+                <button
+                  className="mobile-audio-close"
+                  type="button"
+                  onClick={closeMobilePlayer}
+                  aria-label="Fechar player e pausar música"
+                >
+                  <X size={17} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="mobile-audio-progress">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 0}
+                  value={progress}
+                  onChange={(event) => {
+                    const nextProgress = Number(event.target.value);
+                    setProgress(nextProgress);
+                    if (audioRef.current) audioRef.current.currentTime = nextProgress;
+                  }}
+                  aria-label={`Progresso de ${track.title}`}
+                  style={{ '--progress': `${duration ? (progress / duration) * 100 : 0}%` }}
+                />
+                <div className="mobile-audio-time">
+                  <span>{formatTime(progress)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
+              <div className="mobile-audio-controls">
+                <button type="button" onClick={() => selectTrack(trackIndex - 1)} aria-label="Faixa anterior">
+                  <SkipBack size={16} fill="currentColor" />
+                </button>
+                <button
+                  className="mobile-audio-play"
+                  type="button"
+                  onClick={togglePlayback}
+                  aria-label={isPlaying ? 'Pausar' : 'Retomar reprodução'}
+                >
+                  {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                </button>
+                <button type="button" onClick={() => selectTrack(trackIndex + 1)} aria-label="Próxima faixa">
+                  <SkipForward size={16} fill="currentColor" />
+                </button>
+                <label className="mobile-audio-volume" aria-label="Volume">
+                  <Volume2 size={15} aria-hidden="true" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.35"
+                    step="0.01"
+                    value={volume}
+                    onChange={(event) => setVolume(Number(event.target.value))}
+                  />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="mobile-audio-trigger"
+              type="button"
+              onClick={() => setMobilePlayerExpanded(true)}
+              aria-label={`Abrir controles de ${track.title}`}
+              aria-expanded="false"
+            >
+              {track.cover ? (
+                <img className="mobile-audio-cover" src={track.cover} alt="" />
+              ) : (
+                <span className="mobile-audio-cover-fallback"><AudioLines size={18} /></span>
+              )}
+              <span className="mobile-audio-trigger-copy">
+                <strong>{track.title}</strong>
+                <small>{isPlaying ? 'TOCANDO AGORA' : 'PAUSADA'}</small>
+              </span>
+              {isPlaying && <AudioLines className="mobile-audio-live" size={17} aria-hidden="true" />}
+              <ChevronUp size={18} aria-hidden="true" />
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -528,6 +734,7 @@ function ProjectCard({ project, index, total, isClone = false }) {
 export default function Portfolio() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [navScrolled, setNavScrolled] = useState(false);
+  const [navElement, setNavElement] = useState(null);
   const [starsOpacity, setStarsOpacity] = useState(0);
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
   const projectCarouselRef = useRef(null);
@@ -687,14 +894,18 @@ export default function Portfolio() {
       <Suspense fallback={null}>
         <StarsBackground style={{ opacity: starsOpacity }} />
       </Suspense>
-      <nav className={`site-nav${navScrolled ? ' site-nav-scrolled' : ''}`} aria-label="Navegação principal">
+      <nav
+        ref={setNavElement}
+        className={`site-nav${navScrolled ? ' site-nav-scrolled' : ''}`}
+        aria-label="Navegação principal"
+      >
         <a className="brand" href="#inicio" onClick={closeMenu} aria-label="Yasmin Beviláqua, início">
           <img className="brand-logo" src={publicAsset('logoya.png')} alt="" />
           <span className="brand-name">Yasmin<span>.</span></span>
         </a>
 
         <button
-          className="menu-toggle"
+          className={`menu-toggle${menuOpen ? ' menu-toggle-open' : ''}`}
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
           aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
@@ -745,7 +956,7 @@ export default function Portfolio() {
           </div>
 
           <div className="hero-art hero-profile-art">
-            <MiniPlaylist />
+            <MiniPlaylist navElement={navElement} navScrolled={navScrolled} />
           </div>
         </article>
       </section>
