@@ -480,6 +480,15 @@ export default function Portfolio() {
   const [starsOpacity, setStarsOpacity] = useState(0);
 
   useEffect(() => {
+    const loadingScreen = document.getElementById('loading-screen');
+    if (!loadingScreen) return undefined;
+
+    loadingScreen.classList.add('loading-screen-hidden');
+    const removeLoadingScreen = window.setTimeout(() => loadingScreen.remove(), 400);
+    return () => window.clearTimeout(removeLoadingScreen);
+  }, []);
+
+  useEffect(() => {
     const updateNavScrolled = () => setNavScrolled(window.scrollY > 32);
     updateNavScrolled();
     window.addEventListener('scroll', updateNavScrolled, { passive: true });

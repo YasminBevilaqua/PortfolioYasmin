@@ -6,9 +6,85 @@
     <meta name="theme-color" content="#100d18" />
     <meta name="description" content="Portfólio de Yasmin Beviláqua, desenvolvedora Front-End. Interfaces responsivas, experiências digitais e projetos criativos." />
     <meta name="author" content="Yasmin Beviláqua" />
-    <title>Yasmin Beviláqua — Desenvolvedora Front-End</title>
+    <title>Yasmin Portfolio</title>
+    <style>
+      #loading-screen {
+        position: fixed;
+        z-index: 9999;
+        inset: 0;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 16px;
+        background: #100d18;
+        color: #f5f2fb;
+        font-family: Arial, sans-serif;
+        transition: opacity 350ms ease, visibility 350ms ease;
+      }
+
+      #loading-screen.loading-screen-hidden {
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loading-mark {
+        display: grid;
+        width: 52px;
+        height: 52px;
+        place-items: center;
+        border: 1px solid rgba(196, 164, 255, 0.5);
+        border-radius: 16px;
+        background: rgba(196, 164, 255, 0.12);
+        color: #decaff;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .loading-message {
+        margin: 0;
+        color: #c9c1d5;
+        font-size: 13px;
+        letter-spacing: 0.02em;
+      }
+
+      .loading-track {
+        width: 150px;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(233, 220, 255, 0.12);
+      }
+
+      .loading-track::after {
+        display: block;
+        width: 45%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #c4a4ff, #f18bc7);
+        content: "";
+        animation: loading-sweep 1.2s ease-in-out infinite;
+      }
+
+      @keyframes loading-sweep {
+        from { transform: translateX(-110%); }
+        to { transform: translateX(330%); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .loading-track::after {
+          width: 100%;
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="loading-screen" role="status" aria-live="polite">
+      <span class="loading-mark" aria-hidden="true">YB</span>
+      <p class="loading-message">Carregando meu portfólio...</p>
+      <span class="loading-track" aria-hidden="true"></span>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
