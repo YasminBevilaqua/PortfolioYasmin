@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 const StarsBackground = lazy(() => import('./StarsBackground.jsx'));
+const publicAsset = (path) => `${import.meta.env.BASE_URL}${path}`;
 
 const experiences = [
   {
@@ -71,7 +72,7 @@ const projects = [
     title: 'NebulaMind',
     description:
       'Chat com IA que transforma conversas em experiência: respostas naturais, interface imersiva e um fluxo pensado para levar do primeiro prompt ao insight final.',
-    image: '/project-nebulamind.png',
+    image: publicAsset('project-nebulamind.png'),
     imageAlt: 'Capa do projeto NebulaMind',
     icon: Sparkles,
     stack: ['Vite', 'React', 'TypeScript', 'Tailwind', 'shadcn/ui', 'Groq', 'Three.js'],
@@ -82,7 +83,7 @@ const projects = [
     title: 'Spatialify',
     description:
       'Extensão de navegador que transforma áudio comum em uma experiência espacial imersiva, adicionando profundidade, direção e movimento em tempo real.',
-    image: '/project-spatialify.png',
+    image: publicAsset('project-spatialify.png'),
     imageAlt: 'Capa do projeto Spatialify',
     icon: AudioLines,
     stack: ['HTML', 'CSS', 'JavaScript', 'Mozilla Add-ons'],
@@ -93,7 +94,7 @@ const projects = [
     title: 'SouJunior Apoia.se',
     description:
       'Landing page para apresentar a iniciativa SouJunior, destacar seu impacto social e convidar apoiadores a contribuir pelo Apoia.se.',
-    image: '/project-soujunior.png',
+    image: publicAsset('project-soujunior.png'),
     imageAlt: 'Capa do projeto SouJunior Apoia.se',
     icon: Code2,
     stack: ['Next.js', 'React', 'TypeScript', 'CSS Modules'],
@@ -185,8 +186,8 @@ function TechIconsGrid() {
         >
           <span className="tech-icon-name">{tech.name}</span>
           <span className="tech-icon-stack">
-            <img className="tech-icon-img" src={`/images/${encodeURIComponent(tech.file)}`} alt="" draggable="false" />
-            <img className="tech-icon-reflect" src={`/images/${encodeURIComponent(tech.file)}`} alt="" aria-hidden="true" draggable="false" />
+            <img className="tech-icon-img" src={publicAsset(`images/${encodeURIComponent(tech.file)}`)} alt="" draggable="false" />
+            <img className="tech-icon-reflect" src={publicAsset(`images/${encodeURIComponent(tech.file)}`)} alt="" aria-hidden="true" draggable="false" />
           </span>
         </a>
       </div>
@@ -221,7 +222,7 @@ const playlist = [
     mood: 'CLUB EDIT',
     color: '#ef9acb',
     cover: 'https://cdn-images.dzcdn.net/images/cover/666f254b772127dd8b15954d4f52af16/250x250-000000-80-0-0.jpg',
-    source: '/audio/hear-me-now.mp3',
+    source: publicAsset('audio/hear-me-now.mp3'),
   },
   {
     title: 'Never Let Me Go',
@@ -229,7 +230,7 @@ const playlist = [
     mood: 'RADIO EDIT',
     color: '#8ec5ff',
     cover: 'https://cdn-images.dzcdn.net/images/cover/33af72cf5d034401a550047993904f26/250x250-000000-80-0-0.jpg',
-    source: '/audio/Never Let Me Go Radio Edit.mp3',
+    source: publicAsset('audio/Never Let Me Go Radio Edit.mp3'),
   },
   {
     title: 'Wild One',
@@ -237,7 +238,7 @@ const playlist = [
     mood: 'DANCE',
     color: '#f5b96b',
     cover: 'https://cdn-images.dzcdn.net/images/cover/2e42982f9872e2a561ea3e40434f1c3b/250x250-000000-80-0-0.jpg',
-    source: '/audio/Lucky Rose - Wild One feat. Tep No (Cover Art).mp3',
+    source: publicAsset('audio/Lucky Rose - Wild One feat. Tep No (Cover Art).mp3'),
   },
   {
     title: 'Halfway',
@@ -245,7 +246,7 @@ const playlist = [
     mood: 'ELECTRONIC',
     color: '#9fe0c0',
     cover: 'https://cdn-images.dzcdn.net/images/cover/ead044f28f99cf94419963165144a477/250x250-000000-80-0-0.jpg',
-    source: '/audio/Halfway (with Bhaskar).mp3',
+    source: publicAsset('audio/Halfway (with Bhaskar).mp3'),
   },
 ];
 
