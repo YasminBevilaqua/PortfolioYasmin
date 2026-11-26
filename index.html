@@ -8,82 +8,238 @@
     <meta name="author" content="Yasmin Beviláqua" />
     <title>Yasmin Portfolio</title>
     <style>
-      #loading-screen {
+      #loading-screen.page-loader {
+        --loader-purple: 267 100% 82%;
+        --loader-pink: 326 79% 75%;
+        --loader-lilac: 267 100% 88%;
         position: fixed;
-        z-index: 9999;
         inset: 0;
-        display: grid;
-        align-content: center;
-        justify-items: center;
-        gap: 16px;
-        background: #100d18;
-        color: #f5f2fb;
-        font-family: Arial, sans-serif;
-        transition: opacity 350ms ease, visibility 350ms ease;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        background: var(--page, #100d18);
+        transition:
+          opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+          visibility 0.55s step-end;
       }
 
-      #loading-screen.loading-screen-hidden {
+      #loading-screen.page-loader--out {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
       }
 
-      .loading-mark {
-        display: grid;
-        width: 52px;
-        height: 52px;
-        place-items: center;
-        border: 1px solid rgba(196, 164, 255, 0.5);
-        border-radius: 16px;
-        background: rgba(196, 164, 255, 0.12);
-        color: #decaff;
-        font-size: 17px;
-        font-weight: 700;
+      .page-loader__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
       }
 
-      .loading-message {
+      .atom-scene {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        perspective: 880px;
+      }
+
+      .atom-nucleus {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 2;
+        width: 16px;
+        height: 16px;
+        margin: -8px 0 0 -8px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, hsl(var(--loader-purple)), hsl(var(--loader-pink)), hsl(var(--loader-lilac)));
+        box-shadow:
+          0 0 12px hsl(var(--loader-purple) / 0.9),
+          0 0 26px hsl(var(--loader-pink) / 0.55),
+          0 0 44px hsl(var(--loader-lilac) / 0.35);
+      }
+
+      .atom-spin,
+      .atom-orbit-wrap,
+      .atom-orbit-precess {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+      }
+
+      .atom-orbit-wrap {
+        pointer-events: none;
+      }
+
+      .atom-orbit-wrap--a { transform: rotateY(0deg) rotateX(52deg); }
+      .atom-orbit-wrap--b { transform: rotateY(60deg) rotateX(52deg); }
+      .atom-orbit-wrap--c { transform: rotateY(120deg) rotateX(52deg); }
+      .atom-orbit-wrap--d { transform: rotateY(180deg) rotateX(52deg); }
+      .atom-orbit-wrap--e { transform: rotateY(240deg) rotateX(52deg); }
+      .atom-orbit-wrap--f { transform: rotateY(300deg) rotateX(52deg); }
+
+      .atom-orbit-precess {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+      }
+
+      @keyframes atom-precess-lr {
+        from { transform: rotateY(0deg); }
+        to { transform: rotateY(360deg); }
+      }
+
+      @keyframes atom-precess-tb {
+        from { transform: rotateX(0deg); }
+        to { transform: rotateX(360deg); }
+      }
+
+      @keyframes atom-precess-dlr {
+        from { transform: rotate3d(1, 3, 0, 0deg); }
+        to { transform: rotate3d(1, 1, 0, 360deg); }
+      }
+
+      @keyframes atom-precess-drl {
+        from { transform: rotate3d(1, -2, 0, 0deg); }
+        to { transform: rotate3d(1, -1, 0, 360deg); }
+      }
+
+      .atom-orbit-precess--lr { animation: atom-precess-lr 12s linear infinite; }
+      .atom-orbit-precess--tb { animation: atom-precess-tb 11.5s linear infinite; }
+      .atom-orbit-precess--dlr { animation: atom-precess-dlr 14s linear infinite; }
+      .atom-orbit-precess--drl { animation: atom-precess-drl 14s linear infinite; }
+      .atom-orbit-precess--lr.atom-orbit-precess--rev { animation: atom-precess-lr 13.5s linear infinite reverse; }
+      .atom-orbit-precess--tb.atom-orbit-precess--rev { animation: atom-precess-tb 10.5s linear infinite reverse; }
+
+      @keyframes atom-orbit-twirl {
+        from { transform: rotateZ(0deg); }
+        to { transform: rotateZ(360deg); }
+      }
+
+      @keyframes atom-orbit-twirl-ccw {
+        from { transform: rotateZ(0deg); }
+        to { transform: rotateZ(-360deg); }
+      }
+
+      .atom-orbit-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        transform-origin: 50% 50%;
+        will-change: transform;
+        animation: atom-orbit-twirl 2.35s linear infinite;
+        -webkit-mask: radial-gradient(circle, transparent 53.8%, #000 54.2%, #000 57.2%, transparent 57.7%);
+        mask: radial-gradient(circle, transparent 53.8%, #000 54.2%, #000 57.2%, transparent 57.7%);
+      }
+
+      .atom-orbit-ring--a {
+        background: conic-gradient(from 40deg, hsl(var(--loader-purple)) 0deg, hsl(var(--loader-purple) / 0.88) 24deg, hsl(var(--loader-purple) / 0.5) 58deg, hsl(var(--loader-purple) / 0.16) 88deg, hsl(var(--loader-purple) / 0.04) 108deg, transparent 128deg, transparent 360deg);
+        filter: drop-shadow(0 0 6px hsl(var(--loader-purple) / 0.65)) drop-shadow(0 0 14px hsl(var(--loader-purple) / 0.28));
+        animation-name: atom-orbit-twirl;
+        animation-duration: 2.2s;
+      }
+
+      .atom-orbit-ring--b {
+        background: conic-gradient(from 220deg, hsl(var(--loader-pink)) 0deg, hsl(var(--loader-pink) / 0.9) 22deg, hsl(var(--loader-pink) / 0.52) 56deg, hsl(var(--loader-pink) / 0.17) 86deg, hsl(var(--loader-pink) / 0.05) 106deg, transparent 126deg, transparent 360deg);
+        filter: drop-shadow(0 0 6px hsl(var(--loader-pink) / 0.6)) drop-shadow(0 0 14px hsl(var(--loader-pink) / 0.26));
+        animation-name: atom-orbit-twirl-ccw;
+        animation-duration: 2.75s;
+      }
+
+      .atom-orbit-ring--c {
+        background: conic-gradient(from 155deg, hsl(var(--loader-lilac)) 0deg, hsl(var(--loader-lilac) / 0.88) 24deg, hsl(var(--loader-lilac) / 0.48) 58deg, hsl(var(--loader-lilac) / 0.15) 90deg, hsl(var(--loader-lilac) / 0.04) 110deg, transparent 130deg, transparent 360deg);
+        filter: drop-shadow(0 0 7px hsl(var(--loader-lilac) / 0.62)) drop-shadow(0 0 15px hsl(var(--loader-lilac) / 0.28));
+        animation-name: atom-orbit-twirl-ccw;
+        animation-duration: 3.1s;
+      }
+
+      .atom-orbit-ring--d {
+        background: conic-gradient(from 300deg, hsl(var(--loader-purple)) 0deg, hsl(var(--loader-pink) / 0.9) 26deg, hsl(var(--loader-pink) / 0.55) 58deg, hsl(var(--loader-purple) / 0.16) 88deg, hsl(var(--loader-pink) / 0.06) 108deg, transparent 128deg, transparent 360deg);
+        filter: drop-shadow(0 0 6px hsl(var(--loader-purple) / 0.45)) drop-shadow(0 0 10px hsl(var(--loader-pink) / 0.35)) drop-shadow(0 0 14px hsl(var(--loader-pink) / 0.2));
+        animation-name: atom-orbit-twirl;
+        animation-duration: 2.5s;
+      }
+
+      .atom-orbit-ring--e {
+        background: conic-gradient(from 85deg, hsl(var(--loader-pink)) 0deg, hsl(var(--loader-lilac) / 0.92) 30deg, hsl(var(--loader-lilac) / 0.5) 60deg, hsl(var(--loader-pink) / 0.14) 90deg, hsl(var(--loader-lilac) / 0.05) 110deg, transparent 130deg, transparent 360deg);
+        filter: drop-shadow(0 0 6px hsl(var(--loader-pink) / 0.4)) drop-shadow(0 0 10px hsl(var(--loader-lilac) / 0.38)) drop-shadow(0 0 14px hsl(var(--loader-lilac) / 0.2));
+        animation-name: atom-orbit-twirl-ccw;
+        animation-duration: 3.35s;
+      }
+
+      .atom-orbit-ring--f {
+        background: conic-gradient(from 275deg, hsl(var(--loader-purple)) 0deg, hsl(var(--loader-purple) / 0.88) 24deg, hsl(var(--loader-purple) / 0.5) 58deg, hsl(var(--loader-purple) / 0.16) 88deg, hsl(var(--loader-purple) / 0.04) 108deg, transparent 128deg, transparent 360deg);
+        filter: drop-shadow(0 0 6px hsl(var(--loader-purple) / 0.65)) drop-shadow(0 0 14px hsl(var(--loader-purple) / 0.28));
+        animation-name: atom-orbit-twirl-ccw;
+        animation-duration: 2.65s;
+      }
+
+      .page-loader__label {
         margin: 0;
-        color: #c9c1d5;
-        font-size: 13px;
-        letter-spacing: 0.02em;
-      }
-
-      .loading-track {
-        width: 150px;
-        height: 3px;
-        overflow: hidden;
-        border-radius: 999px;
-        background: rgba(233, 220, 255, 0.12);
-      }
-
-      .loading-track::after {
-        display: block;
-        width: 45%;
-        height: 100%;
-        border-radius: inherit;
-        background: linear-gradient(90deg, #c4a4ff, #f18bc7);
-        content: "";
-        animation: loading-sweep 1.2s ease-in-out infinite;
-      }
-
-      @keyframes loading-sweep {
-        from { transform: translateX(-110%); }
-        to { transform: translateX(330%); }
+        color: hsl(var(--loader-purple));
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        filter: drop-shadow(0 0 10px hsl(var(--loader-purple) / 0.4));
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .loading-track::after {
-          width: 100%;
-          animation: none;
+        #loading-screen {
+          transition: none;
+        }
+
+        #loading-screen .atom-spin,
+        #loading-screen .atom-orbit-precess,
+        #loading-screen .atom-orbit-ring {
+          animation: none !important;
         }
       }
     </style>
   </head>
   <body>
-    <div id="loading-screen" role="status" aria-live="polite">
-      <span class="loading-mark" aria-hidden="true">YB</span>
-      <p class="loading-message">Carregando meu portfólio...</p>
-      <span class="loading-track" aria-hidden="true"></span>
+    <div id="loading-screen" class="page-loader" role="status" aria-live="polite" aria-busy="true">
+      <div class="page-loader__inner">
+        <div class="atom-scene" aria-hidden="true">
+          <span class="atom-nucleus" aria-hidden="true"></span>
+          <div class="atom-spin">
+            <div class="atom-orbit-wrap atom-orbit-wrap--a">
+              <div class="atom-orbit-precess atom-orbit-precess--lr">
+                <div class="atom-orbit-ring atom-orbit-ring--a"></div>
+              </div>
+            </div>
+            <div class="atom-orbit-wrap atom-orbit-wrap--b">
+              <div class="atom-orbit-precess atom-orbit-precess--tb">
+                <div class="atom-orbit-ring atom-orbit-ring--b"></div>
+              </div>
+            </div>
+            <div class="atom-orbit-wrap atom-orbit-wrap--c">
+              <div class="atom-orbit-precess atom-orbit-precess--dlr">
+                <div class="atom-orbit-ring atom-orbit-ring--c"></div>
+              </div>
+            </div>
+            <div class="atom-orbit-wrap atom-orbit-wrap--d">
+              <div class="atom-orbit-precess atom-orbit-precess--drl">
+                <div class="atom-orbit-ring atom-orbit-ring--d"></div>
+              </div>
+            </div>
+            <div class="atom-orbit-wrap atom-orbit-wrap--e">
+              <div class="atom-orbit-precess atom-orbit-precess--lr atom-orbit-precess--rev">
+                <div class="atom-orbit-ring atom-orbit-ring--e"></div>
+              </div>
+            </div>
+            <div class="atom-orbit-wrap atom-orbit-wrap--f">
+              <div class="atom-orbit-precess atom-orbit-precess--tb atom-orbit-precess--rev">
+                <div class="atom-orbit-ring atom-orbit-ring--f"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="page-loader__label">Carregando</p>
+      </div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

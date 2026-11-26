@@ -1,8 +1,10 @@
-import { createElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { createElement, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import {
   ArrowUpRight,
   AudioLines,
+  ChevronLeft,
+  ChevronRight,
   Code2,
   ExternalLink,
   Github,
@@ -11,6 +13,7 @@ import {
   Mail,
   MessageCircle,
   Menu,
+  MousePointer2,
   Pause,
   Play,
   SkipBack,
@@ -22,6 +25,8 @@ import {
 
 const StarsBackground = lazy(() => import('./StarsBackground.jsx'));
 const publicAsset = (path) => `${import.meta.env.BASE_URL}${path}`;
+const PAGE_LOADER_MIN_MS = 900;
+const PROJECT_AUTOPLAY_SPEED = 36;
 
 const experiences = [
   {
@@ -101,7 +106,38 @@ const projects = [
     liveUrl: 'https://soujunior-apoiase-landing-llgj.vercel.app/',
     githubUrl: 'https://github.com/inovacao-squad/soujunior-apoiase-landing',
   },
+  {
+    title: 'Studio Blush',
+    description:
+      'SDK open-source de maquiagem virtual e remodelagem facial em realidade aumentada, com rastreamento em tempo real direto no navegador.',
+    image: publicAsset('project-studioblush.png'),
+    imageAlt: 'Capa do projeto Studio Blush',
+    icon: Sparkles,
+    stack: ['JavaScript', 'Three.js', 'MediaPipe', 'WebGL', 'GLSL'],
+    githubUrl: 'https://github.com/YasminBevilaqua/StudioBlush',
+  },
+  {
+    title: 'MouseVirtual',
+    description:
+      'Mouse virtual controlado por gestos: usa a webcam e o MediaPipe para rastrear as mãos e transformar movimentos em comandos para o computador.',
+    image: publicAsset('project-mousevirtual.png'),
+    imageAlt: 'Capa do projeto MouseVirtual',
+    icon: MousePointer2,
+    stack: ['Python', 'MediaPipe', 'OpenCV', 'NumPy', 'pynput'],
+    githubUrl: 'https://github.com/YasminBevilaqua/MouseVirtual',
+  },
 ];
+
+const getCarouselMetrics = (viewport) => {
+  const firstSlide = viewport.firstElementChild;
+  if (!firstSlide) return { activeIndex: 0 };
+
+  const gap = Number.parseFloat(window.getComputedStyle(viewport).columnGap) || 0;
+  const step = firstSlide.getBoundingClientRect().width + gap;
+  const activeIndex = Math.round(viewport.scrollLeft / step) % projects.length;
+
+  return { activeIndex };
+};
 
 const socialLinks = [
   {
@@ -332,6 +368,15 @@ function MiniPlaylist() {
             {hasPlaybackError ? 'AUDIO ERROR' : 'PAUSED'}
           </span>
         )}
+        {isPlaying && (
+          <span className="mini-player-wave" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
+        )}
       </div>
       <div className="mini-player-main">
         <div className="record-cover" style={{ '--track-color': track.color }}>
@@ -386,7 +431,6 @@ function MiniPlaylist() {
       <div className="player-queue">
         <div className="player-queue-heading">
           <span>NA FILA</span>
-          <span>{String(playlist.length).padStart(2, '0')} FAIXAS</span>
         </div>
         {playlist.map((item, index) => (
           <button
@@ -410,17 +454,24 @@ function MiniPlaylist() {
   );
 }
 
-function ProjectCard({ project, index }) {
+function ProjectCard({ project, index, total, isClone = false }) {
   const Icon = project.icon;
 
   return (
-    <article className={`project-card project-card-${index + 1}`}>
+    <article
+      className={`project-card project-card-${index + 1}`}
+      role="group"
+      aria-roledescription="slide"
+      aria-label={`${index + 1} de ${total}: ${project.title}`}
+      aria-hidden={isClone || undefined}
+    >
       {project.image ? (
         <a
           className="project-image-link"
-          href={project.liveUrl}
+          href={project.liveUrl || project.githubUrl}
           target="_blank"
           rel="noreferrer"
+          tabIndex={isClone ? -1 : undefined}
           aria-label={`Abrir ${project.title}`}
         >
           <img
@@ -458,12 +509,12 @@ function ProjectCard({ project, index }) {
         {(project.liveUrl || project.githubUrl) && (
           <div className="project-links">
             {project.liveUrl && (
-              <a href={project.liveUrl} target="_blank" rel="noreferrer">
+              <a href={project.liveUrl} target="_blank" rel="noreferrer" tabIndex={isClone ? -1 : undefined}>
                 Ver projeto <ExternalLink size={15} />
               </a>
             )}
             {project.githubUrl && (
-              <a href={project.githubUrl} target="_blank" rel="noreferrer">
+              <a href={project.githubUrl} target="_blank" rel="noreferrer" tabIndex={isClone ? -1 : undefined}>
                 <Github size={15} /> GitHub
               </a>
             )}
@@ -478,14 +529,121 @@ export default function Portfolio() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [navScrolled, setNavScrolled] = useState(false);
   const [starsOpacity, setStarsOpacity] = useState(0);
+  const [activeProjectIndex, setActiveProjectIndex] = useState(0);
+  const projectCarouselRef = useRef(null);
+  const lastProjectIndex = projects.length - 1;
+
+  const scrollToProject = useCallback((index) => {
+    const viewport = projectCarouselRef.current;
+    if (!viewport) return;
+
+    const targetIndex = Math.max(0, Math.min(index, lastProjectIndex));
+    const slide = viewport.children[targetIndex];
+    if (!slide) return;
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const slideRect = slide.getBoundingClientRect();
+    const left = viewport.scrollLeft + slideRect.left - viewportRect.left;
+
+    viewport.scrollTo({
+      left,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+    setActiveProjectIndex(targetIndex);
+  }, [lastProjectIndex]);
+
+  const updateActiveProject = useCallback((viewport) => {
+    const { activeIndex } = getCarouselMetrics(viewport);
+    setActiveProjectIndex(activeIndex);
+  }, []);
+
+  useEffect(() => {
+    const viewport = projectCarouselRef.current;
+    if (!viewport) return undefined;
+
+    const updateCarouselOnResize = () => updateActiveProject(viewport);
+    updateCarouselOnResize();
+    window.addEventListener('resize', updateCarouselOnResize);
+
+    return () => window.removeEventListener('resize', updateCarouselOnResize);
+  }, [updateActiveProject]);
+
+  useEffect(() => {
+    const viewport = projectCarouselRef.current;
+    const carousel = viewport?.parentElement;
+    if (!viewport || !carousel) return undefined;
+
+    const getCycleWidth = () => {
+      const firstSlide = viewport.children[0];
+      const firstDuplicate = viewport.children[projects.length];
+      if (!firstSlide || !firstDuplicate) return 0;
+      return firstDuplicate.getBoundingClientRect().left - firstSlide.getBoundingClientRect().left;
+    };
+
+    let cycleWidth = getCycleWidth();
+    let previousFrameTime = 0;
+    let preciseScrollLeft = viewport.scrollLeft;
+    let previousScrollLeft = viewport.scrollLeft;
+    let animationFrame;
+    const updateCycleWidth = () => {
+      cycleWidth = getCycleWidth();
+    };
+
+    const moveCarousel = (frameTime) => {
+      if (carousel.matches(':hover')) {
+        preciseScrollLeft = viewport.scrollLeft;
+      } else if (previousFrameTime) {
+        const elapsed = Math.min(frameTime - previousFrameTime, 50);
+        if (Math.abs(viewport.scrollLeft - previousScrollLeft) > 1) {
+          preciseScrollLeft = viewport.scrollLeft;
+        }
+        preciseScrollLeft += (PROJECT_AUTOPLAY_SPEED * elapsed) / 1000;
+        if (cycleWidth > 0 && preciseScrollLeft >= cycleWidth) {
+          preciseScrollLeft %= cycleWidth;
+        }
+        viewport.scrollLeft = preciseScrollLeft;
+      }
+
+      previousFrameTime = frameTime;
+      previousScrollLeft = viewport.scrollLeft;
+      animationFrame = window.requestAnimationFrame(moveCarousel);
+    };
+
+    window.addEventListener('resize', updateCycleWidth);
+    animationFrame = window.requestAnimationFrame(moveCarousel);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', updateCycleWidth);
+    };
+  }, []);
 
   useEffect(() => {
     const loadingScreen = document.getElementById('loading-screen');
     if (!loadingScreen) return undefined;
 
-    loadingScreen.classList.add('loading-screen-hidden');
-    const removeLoadingScreen = window.setTimeout(() => loadingScreen.remove(), 400);
-    return () => window.clearTimeout(removeLoadingScreen);
+    const startedAt = performance.now();
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let hideTimer;
+    let removeTimer;
+
+    const hideLoader = () => {
+      loadingScreen.classList.add('page-loader--out');
+      loadingScreen.setAttribute('aria-busy', 'false');
+      removeTimer = window.setTimeout(() => loadingScreen.remove(), 600);
+    };
+
+    if (prefersReducedMotion) {
+      hideLoader();
+    } else {
+      const remaining = Math.max(0, PAGE_LOADER_MIN_MS - (performance.now() - startedAt));
+      hideTimer = window.setTimeout(hideLoader, remaining);
+    }
+
+    return () => {
+      if (hideTimer) window.clearTimeout(hideTimer);
+      if (removeTimer) window.clearTimeout(removeTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -531,7 +689,7 @@ export default function Portfolio() {
       </Suspense>
       <nav className={`site-nav${navScrolled ? ' site-nav-scrolled' : ''}`} aria-label="Navegação principal">
         <a className="brand" href="#inicio" onClick={closeMenu} aria-label="Yasmin Beviláqua, início">
-          <span className="brand-mark">YB</span>
+          <img className="brand-logo" src={publicAsset('logoya.png')} alt="" />
           <span className="brand-name">Yasmin<span>.</span></span>
         </a>
 
@@ -625,10 +783,72 @@ export default function Portfolio() {
           title={<>Meus <span className="accent">projetos.</span></>}
           description="Um pouco do que venho criando entre interfaces, áudio e dados."
         />
-        <div className="projects-grid">
-          {projects.map((project, index) => (
-            <ProjectCard key={project.title} project={project} index={index} />
-          ))}
+        <div
+          className="projects-carousel"
+        >
+          <button
+            className="projects-carousel-button"
+            type="button"
+            aria-label="Projeto anterior"
+            disabled={activeProjectIndex === 0}
+            onClick={() => scrollToProject(activeProjectIndex - 1)}
+          >
+            <ChevronLeft size={19} />
+          </button>
+          <div
+            className="projects-grid"
+            ref={projectCarouselRef}
+            role="region"
+            aria-label="Projetos em destaque"
+            aria-roledescription="carrossel"
+            tabIndex={0}
+            onScroll={(event) => updateActiveProject(event.currentTarget)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                scrollToProject((activeProjectIndex + projects.length - 1) % projects.length);
+              } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                scrollToProject((activeProjectIndex + 1) % projects.length);
+              }
+            }}
+          >
+            {[...projects, ...projects].map((project, index) => {
+              const projectIndex = index % projects.length;
+              return (
+                <ProjectCard
+                  key={`${project.title}-${index}`}
+                  project={project}
+                  index={projectIndex}
+                  total={projects.length}
+                  isClone={index >= projects.length}
+                />
+              );
+            })}
+          </div>
+          <button
+            className="projects-carousel-button"
+            type="button"
+            aria-label="Próximo projeto"
+            disabled={activeProjectIndex === lastProjectIndex}
+            onClick={() => scrollToProject(activeProjectIndex + 1)}
+          >
+            <ChevronRight size={19} />
+          </button>
+          <div className="projects-carousel-controls">
+            <div className="projects-pagination" role="group" aria-label="Selecionar projeto">
+              {projects.map((project, index) => (
+                <button
+                  key={project.title}
+                  className={`projects-pagination-dot${index === activeProjectIndex ? ' is-active' : ''}`}
+                  type="button"
+                  aria-label={`Mostrar projetos a partir de ${project.title}`}
+                  aria-current={index === activeProjectIndex ? 'true' : undefined}
+                  onClick={() => scrollToProject(index)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
         <a className="all-projects-link" href="https://github.com/YasminBevilaqua" target="_blank" rel="noreferrer">
           Mais projetos no GitHub <ArrowUpRight size={17} />
