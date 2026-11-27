@@ -30,6 +30,7 @@ const StarsBackground = lazy(() => import('./StarsBackground.jsx'));
 const publicAsset = (path) => `${import.meta.env.BASE_URL}${path}`;
 const PAGE_LOADER_MIN_MS = 900;
 const PROJECT_AUTOPLAY_SPEED = 36;
+const PROJECT_AUTOPLAY_INTERVAL_MS = 4000;
 
 const experiences = [
   {
@@ -737,27 +738,58 @@ export default function Portfolio() {
   const [navElement, setNavElement] = useState(null);
   const [starsOpacity, setStarsOpacity] = useState(0);
   const [activeProjectIndex, setActiveProjectIndex] = useState(0);
+  const [mobileProjectStep, setMobileProjectStep] = useState(0);
   const projectCarouselRef = useRef(null);
   const lastProjectIndex = projects.length - 1;
+  const mobileProjectIndices = [
+    (Math.floor((mobileProjectStep + 1) / 2) * 2) % projects.length,
+    (Math.floor(mobileProjectStep / 2) * 2 + 1) % projects.length,
+  ];
+  const isMobileCarousel = window.matchMedia('(max-width: 650px)').matches;
+  const activeProjectDisplayIndex = isMobileCarousel ? mobileProjectIndices[0] : activeProjectIndex;
 
   const scrollToProject = useCallback((index) => {
     const viewport = projectCarouselRef.current;
     if (!viewport) return;
 
+    const isMobile = window.matchMedia('(max-width: 650px)').matches;
     const targetIndex = Math.max(0, Math.min(index, lastProjectIndex));
+    if (isMobile) {
+      for (let step = 0; step < projects.length * 2; step += 2) {
+        if ((Math.floor((step + 1) / 2) * 2) % projects.length === targetIndex) {
+          setMobileProjectStep(step);
+          break;
+        }
+      }
+      return;
+    }
+
     const slide = viewport.children[targetIndex];
     if (!slide) return;
 
     const viewportRect = viewport.getBoundingClientRect();
     const slideRect = slide.getBoundingClientRect();
     const left = viewport.scrollLeft + slideRect.left - viewportRect.left;
-
     viewport.scrollTo({
       left,
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
     setActiveProjectIndex(targetIndex);
   }, [lastProjectIndex]);
+
+  const moveProjectPage = useCallback((direction) => {
+    const viewport = projectCarouselRef.current;
+    if (!viewport) return;
+
+    if (!window.matchMedia('(max-width: 650px)').matches) {
+      scrollToProject(activeProjectIndex + direction);
+      return;
+    }
+
+    setMobileProjectStep((step) => (
+      (step + direction + (projects.length * 2)) % (projects.length * 2)
+    ));
+  }, [activeProjectIndex, scrollToProject]);
 
   const updateActiveProject = useCallback((viewport) => {
     const { activeIndex } = getCarouselMetrics(viewport);
@@ -768,7 +800,11 @@ export default function Portfolio() {
     const viewport = projectCarouselRef.current;
     if (!viewport) return undefined;
 
-    const updateCarouselOnResize = () => updateActiveProject(viewport);
+    const updateCarouselOnResize = () => {
+      if (!window.matchMedia('(max-width: 650px)').matches) {
+        updateActiveProject(viewport);
+      }
+    };
     updateCarouselOnResize();
     window.addEventListener('resize', updateCarouselOnResize);
 
@@ -780,6 +816,7 @@ export default function Portfolio() {
     const carousel = viewport?.parentElement;
     if (!viewport || !carousel) return undefined;
 
+    const mobileQuery = window.matchMedia('(max-width: 650px)');
     const getCycleWidth = () => {
       const firstSlide = viewport.children[0];
       const firstDuplicate = viewport.children[projects.length];
@@ -792,6 +829,7 @@ export default function Portfolio() {
     let preciseScrollLeft = viewport.scrollLeft;
     let previousScrollLeft = viewport.scrollLeft;
     let animationFrame;
+    let autoplayInterval;
     const updateCycleWidth = () => {
       cycleWidth = getCycleWidth();
     };
@@ -816,12 +854,36 @@ export default function Portfolio() {
       animationFrame = window.requestAnimationFrame(moveCarousel);
     };
 
+    const startAutoplay = () => {
+      if (mobileQuery.matches) {
+        autoplayInterval = window.setInterval(() => {
+          setMobileProjectStep((step) => (step + 1) % (projects.length * 2));
+        }, PROJECT_AUTOPLAY_INTERVAL_MS);
+        return;
+      }
+
+      previousFrameTime = 0;
+      animationFrame = window.requestAnimationFrame(moveCarousel);
+    };
+
+    const stopAutoplay = () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearInterval(autoplayInterval);
+    };
+    const handleMotionModeChange = () => {
+      stopAutoplay();
+      updateCycleWidth();
+      startAutoplay();
+    };
+
     window.addEventListener('resize', updateCycleWidth);
-    animationFrame = window.requestAnimationFrame(moveCarousel);
+    mobileQuery.addEventListener('change', handleMotionModeChange);
+    startAutoplay();
 
     return () => {
-      window.cancelAnimationFrame(animationFrame);
+      stopAutoplay();
       window.removeEventListener('resize', updateCycleWidth);
+      mobileQuery.removeEventListener('change', handleMotionModeChange);
     };
   }, []);
 
@@ -1001,8 +1063,8 @@ export default function Portfolio() {
             className="projects-carousel-button"
             type="button"
             aria-label="Projeto anterior"
-            disabled={activeProjectIndex === 0}
-            onClick={() => scrollToProject(activeProjectIndex - 1)}
+            disabled={!isMobileCarousel && activeProjectIndex === 0}
+            onClick={() => moveProjectPage(-1)}
           >
             <ChevronLeft size={19} />
           </button>
@@ -1017,14 +1079,14 @@ export default function Portfolio() {
             onKeyDown={(event) => {
               if (event.key === 'ArrowLeft') {
                 event.preventDefault();
-                scrollToProject((activeProjectIndex + projects.length - 1) % projects.length);
+                scrollToProject((activeProjectDisplayIndex + projects.length - 1) % projects.length);
               } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                scrollToProject((activeProjectIndex + 1) % projects.length);
+                scrollToProject((activeProjectDisplayIndex + 1) % projects.length);
               }
             }}
           >
-            {[...projects, ...projects].map((project, index) => {
+            {[...projects, ...projects, ...projects].map((project, index) => {
               const projectIndex = index % projects.length;
               return (
                 <ProjectCard
@@ -1037,12 +1099,22 @@ export default function Portfolio() {
               );
             })}
           </div>
+          <div className="projects-mobile-grid" role="region" aria-label="Projetos em destaque">
+            {mobileProjectIndices.map((projectIndex, columnIndex) => (
+              <ProjectCard
+                key={`mobile-${columnIndex}-${projectIndex}`}
+                project={projects[projectIndex]}
+                index={projectIndex}
+                total={projects.length}
+              />
+            ))}
+          </div>
           <button
             className="projects-carousel-button"
             type="button"
             aria-label="Próximo projeto"
-            disabled={activeProjectIndex === lastProjectIndex}
-            onClick={() => scrollToProject(activeProjectIndex + 1)}
+            disabled={!isMobileCarousel && activeProjectIndex === lastProjectIndex}
+            onClick={() => moveProjectPage(1)}
           >
             <ChevronRight size={19} />
           </button>
@@ -1051,10 +1123,10 @@ export default function Portfolio() {
               {projects.map((project, index) => (
                 <button
                   key={project.title}
-                  className={`projects-pagination-dot${index === activeProjectIndex ? ' is-active' : ''}`}
+                  className={`projects-pagination-dot${index === activeProjectDisplayIndex ? ' is-active' : ''}`}
                   type="button"
                   aria-label={`Mostrar projetos a partir de ${project.title}`}
-                  aria-current={index === activeProjectIndex ? 'true' : undefined}
+                  aria-current={index === activeProjectDisplayIndex ? 'true' : undefined}
                   onClick={() => scrollToProject(index)}
                 />
               ))}
@@ -1103,8 +1175,7 @@ export default function Portfolio() {
       </section>
 
       <footer className="site-footer">
-        <a className="footer-brand" href="#inicio">YB<span>.</span></a>
-        <p>© {new Date().getFullYear()} Yasmin Beviláqua</p>
+        <p>© 2026 Yasmin Beviláqua</p>
         <a href="#inicio">De volta ao topo ↑</a>
       </footer>
     </main>
